@@ -1,0 +1,25 @@
+// Access outside expected principals
+// Alerts when a secret is read by an identity other than the specific
+// managed identities it was scoped to in Part 3. Populate ExpectedPrincipals
+// with the object IDs granted via Grant-ManagedIdentityVaultAccess.ps1 for
+// each secret you want to monitor this closely. Any GET from outside that
+// list on a tightly-scoped secret is exactly what lateral movement into the
+// vault looks like: an identity that was never granted access finding a way
+// to read it anyway (a misconfigured broader role assignment, an inherited
+// permission, or a compromised higher-privilege identity).
+
+let ExpectedPrincipals = dynamic([
+  "11111111-2222-3333-4444-555555555555", // App Service managed identity: sql-admin-password reader
+  "66666666-7777-8888-9999-000000000000"  // Automation Account managed identity: rotation runbook
+]);
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.KEYVAULT"
+| where OperationName == "SecretGet"
+| where ResultType == "Success"
+| extend PrincipalId = tostring(identity_claim_oid_g)
+| extend SecretName = tostring(id_s)
+| extend VaultName = tostring(Resource)
+| extend CallerIpAddress = tostring(CallerIpAddress_s)
+| where PrincipalId !in (ExpectedPrincipals)
+| project TimeGenerated, VaultName, SecretName, PrincipalId, CallerIpAddress
+| order by TimeGenerated desc

@@ -1,0 +1,53 @@
+{
+  "properties": {
+    "displayName": "Key Vaults must use RBAC authorization and deny public network access",
+    "policyType": "Custom",
+    "mode": "Indexed",
+    "description": "Denies creation or update of a Key Vault that uses the legacy access-policy authorization model instead of Azure RBAC, or that leaves public network access enabled. Enforces the pattern this lab builds: per-secret RBAC scoping and network isolation by default. Set to Audit during rollout, Deny once existing vaults are remediated.",
+    "metadata": {
+      "category": "Identity and Access",
+      "source": "secrets-management-vault-lab",
+      "version": "1.0.0"
+    },
+    "parameters": {
+      "effect": {
+        "type": "String",
+        "metadata": {
+          "displayName": "Effect",
+          "description": "Audit while assessing existing vaults; switch to Deny once remediated."
+        },
+        "allowedValues": ["Audit", "Deny", "Disabled"],
+        "defaultValue": "Audit"
+      }
+    },
+    "policyRule": {
+      "if": {
+        "allOf": [
+          {
+            "field": "type",
+            "equals": "Microsoft.KeyVault/vaults"
+          },
+          {
+            "anyOf": [
+              {
+                "field": "Microsoft.KeyVault/vaults/enableRbacAuthorization",
+                "notEquals": "true"
+              },
+              {
+                "field": "Microsoft.KeyVault/vaults/publicNetworkAccess",
+                "notEquals": "Disabled"
+              },
+              {
+                "field": "Microsoft.KeyVault/vaults/enablePurgeProtection",
+                "notEquals": "true"
+              }
+            ]
+          }
+        ]
+      },
+      "then": {
+        "effect": "[parameters('effect')]"
+      }
+    }
+  }
+}

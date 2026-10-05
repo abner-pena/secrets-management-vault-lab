@@ -1,0 +1,23 @@
+// Unauthorized access attempts
+// Surfaces Forbidden results on secret operations: either a misconfigured
+// RBAC assignment blocking a legitimate identity (a rollout problem worth
+// fixing) or a principal actively probing for secrets it has no business
+// touching (a security problem worth investigating). The two look
+// identical in this table; triage by whether the principal is expected to
+// need vault access at all.
+
+AzureDiagnostics
+| where ResourceProvider == "MICROSOFT.KEYVAULT"
+| where OperationName in ("SecretGet", "SecretList", "SecretSet", "SecretDelete")
+| where ResultType == "Forbidden"
+| extend PrincipalId = tostring(identity_claim_oid_g)
+| extend CallerIpAddress = tostring(CallerIpAddress_s)
+| extend VaultName = tostring(Resource)
+| extend SecretName = tostring(id_s)
+| summarize
+    AttemptCount = count(),
+    Operations = make_set(OperationName),
+    FirstAttempt = min(TimeGenerated),
+    LastAttempt = max(TimeGenerated)
+    by PrincipalId, VaultName, CallerIpAddress
+| order by AttemptCount desc
